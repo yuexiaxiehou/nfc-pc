@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>文件共享</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f2f2f7;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .card-header {
+            background-color: #f9f9f9;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e5e5ea;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+        }
+        .category-icon {
+            font-size: 1.2em;
+            margin-right: 10px;
+        }
+        .upload-area {
+            padding: 20px;
+            text-align: center;
+            border: 2px dashed #007aff;
+            border-radius: 10px;
+            margin: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .upload-area:hover {
+            background-color: #f0f8ff;
+        }
+        #file-input {
+            display: none;
+        }
+        .file-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            border-bottom: 1px solid #e5e5ea;
+            transition: background-color 0.2s;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-item:hover {
+            background-color: #f9f9f9;
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+            min-width: 0; /* 允许文本截断 */
+        }
+        .file-icon {
+            width: 28px;
+            height: 28px;
+            margin-right: 12px;
+            background-color: #007aff;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            flex-shrink: 0; /* 防止图标被压缩 */
+        }
+        .file-details .file-name {
+            font-weight: 500;
+            color: #000;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis; /* 文件名过长时显示省略号 */
+        }
+        .file-details .file-size {
+            font-size: 12px;
+            color: #8e8e93;
+        }
+        .download-btn {
+            background: none;
+            border: none;
+            color: #007aff;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+            flex-shrink: 0; /* 防止按钮被压缩 */
+        }
+        .download-btn:hover {
+            background-color: #e5e5ea;
+        }
+        .message {
+            padding: 15px;
+            margin: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .empty-category {
+            padding: 20px;
+            text-align: center;
+            color: #8e8e93;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📁 文件共享</h1>
+
+        <!-- 上传区域 -->
+        <div class="card">
+            <div class="card-header">上传文件</div>
+            <div class="upload-area" onclick="document.getElementById('file-input').click()">
+                <p>📤 点击或拖拽文件到此处上传</p>
+                <input type="file" id="file-input" onchange="handleFileUpload()">
+            </div>
+            <div id="upload-message"></div>
+        </div>
+
+        <!-- 文件列表容器 -->
+        <div id="files-container">
+            <!-- 文件类别将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', loadFiles);
+
+        // 定义文件分类规则
+        const FILE_CATEGORIES = {
+            images: { name: '图片', icon: '🖼️', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'] },
+            documents: { name: '文档', icon: '📄', extensions: ['pdf', 'doc', 'docx', 'txt', 'ppt', 'pptx', 'xls', 'xlsx'] },
+            videos: { name: '视频', icon: '🎬', extensions: ['mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv'] },
+            archives: { name: '压缩包', icon: '🗜️', extensions: ['zip', 'rar', '7z', 'tar', 'gz'] },
+            others: { name: '其他', icon: '📂', extensions: [] } // 默认分类
+        };
+
+        function getCategory(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            for (const key in FILE_CATEGORIES) {
+                if (FILE_CATEGORIES[key].extensions.includes(ext)) {
+                    return key;
+                }
+            }
+            return 'others';
+        }
+
+        function loadFiles() {
+            fetch('/api/files')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('files-container');
+                    container.innerHTML = ''; // 清空现有内容
+
+                    if (!data.files || data.files.length === 0) {
+                        container.innerHTML = '<div class="card"><div class="empty-category">暂无任何文件</div></div>';
+                        return;
+                    }
+
+                    // 按类别组织文件
+                    const categorizedFiles = {};
+                    data.files.forEach(file => {
+                        const category = getCategory(file.name);
+                        if (!categorizedFiles[category]) {
+                            categorizedFiles[category] = [];
+                        }
+                        categorizedFiles[category].push(file);
+                    });
+
+                    // 渲染每个类别的卡片
+                    for (const key in FILE_CATEGORIES) {
+                        if (categorizedFiles[key]) {
+                            renderCategoryCard(key, categorizedFiles[key]);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('加载文件列表失败:', error);
+                    if (error.status === 401) {
+                        window.location.href = '/login';
+                    }
+                });
+        }
+
+        function renderCategoryCard(categoryKey, files) {
+            const category = FILE_CATEGORIES[categoryKey];
+            const container = document.getElementById('files-container');
+
+            const card = document.createElement('div');
+            card.className = 'card';
+
+            let fileListHTML = '';
+            files.forEach(file => {
+                fileListHTML += `
+                    <li class="file-item">
+                        <div class="file-info">
+                            <div class="file-icon">${file.name.split('.').pop().toUpperCase().substring(0,3)}</div>
+                            <div class="file-details">
+                                <div class="file-name" title="${file.name}">${file.name}</div>
+                                <div class="file-size">${file.size}</div>
+                            </div>
+                        </div>
+                        <button class="download-btn" onclick="downloadFile('${file.name}')">下载</button>
+                    </li>
+                `;
+            });
+
+            card.innerHTML = `
+                <div class="card-header">
+                    <span class="category-icon">${category.icon}</span>
+                    <span>${category.name} (${files.length})</span>
+                </div>
+                <ul class="file-list">
+                    ${fileListHTML}
+                </ul>
+            `;
+            container.appendChild(card);
+        }
+
+        function handleFileUpload() {
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const messageDiv = document.getElementById('upload-message');
+            messageDiv.innerHTML = '';
+
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    messageDiv.innerHTML = `<div class="message success">${data.message}</div>`;
+                    fileInput.value = '';
+                    loadFiles(); // 重新加载文件列表
+                } else {
+                    messageDiv.innerHTML = `<div class="message error">上传失败: ${data.error}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('上传失败:', error);
+                messageDiv.innerHTML = `<div class="message error">上传失败，请检查网络或文件大小。</div>`;
+            });
+        }
+
+        function downloadFile(filename) {
+            window.location.href = `/api/download/${encodeURIComponent(filename)}`;
+        }
+    </script>
+</body>
+</html>
